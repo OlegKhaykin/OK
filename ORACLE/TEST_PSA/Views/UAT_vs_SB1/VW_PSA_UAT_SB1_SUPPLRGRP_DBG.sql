@@ -1,0 +1,41 @@
+CREATE OR REPLACE VIEW vw_psa_uat_sb1_supplrgrp_dbg AS
+WITH
+  -- 04-Mar-2021,R.Donakonda: created UAT test dbg view for ods.suppliergroup table
+  psl as
+  (
+    SELECT /*+ materialize*/ psuid
+    FROM vw_psa_plan_sponsor_list
+  ),
+  new_results AS
+  (
+    SELECT --+ materialize
+      psl.PsuiD, sg.*
+    FROM psl                                     
+    JOIN ahmadmin.supplier                       s
+      ON psl.psuid = s.psuid 
+    JOIN ahmadmin.suppliergroup                  sg
+      ON sg.supplierid = s.supplierid
+  ),      
+  old_results AS
+  (
+    SELECT --+ materialize driving_site(ps)
+    DISTINCT  psl.PsuiD, sg.*
+    FROM psl                                                            
+    JOIN ahmadmin.PlanSponsor@sb1                                       ps
+      ON ps.PlanSponsorUniqueID = psl.psuid
+    JOIN ahmadmin.PlanSponsorControlInfo@sb1                            c
+      ON c.PlanSponsorSKEY = ps.PlanSponsorSKEY
+    JOIN ahmadmin.ControlSuffixAccount@sb1                              csa
+      ON csa.PlansponsorControlInfoSKEY = c.PlansponsorControlInfoSKEY
+    JOIN ahmadmin.SupplierCSAXREF@sb1                                   scx
+      ON scx.ControlSuffixAccountSKEY = csa.ControlSuffixAccountSKEY
+    JOIN ahmadmin.supplier@sb1                                          s
+      ON s.SupplierID = scx.SupplierID
+    JOIN ahmadmin.suppliergroup@sb1                                     sg
+      ON sg.SupplierID  = s.SupplierID
+  )
+SELECT 'ods.Suppliergroup : NEW'  AS Compare, n.* FROM (SELECT * FROM new_results) n
+UNION ALL
+SELECT 'ods.Suppliergroup : OLD'  AS Compare, n.* FROM (SELECT * FROM old_results) n;
+
+GRANT SELECT ON vw_psa_uat_sb1_supplrgrp_dbg TO deployer, ods_dml;
