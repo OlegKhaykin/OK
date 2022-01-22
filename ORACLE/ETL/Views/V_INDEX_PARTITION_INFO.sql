@@ -1,32 +1,75 @@
 CREATE OR REPLACE VIEW v_index_partition_info AS
-SELECT --+ USE_HASH(ISP)
+SELECT
 /*
-  This view is mainly for use by the index-handling procedures
-  from the PKG_DB_MAINTENANCE package. It gives detailed information
-  about each Partition/Subpartition of every locally-partitioned index.
-  History of changes (newest to oldest):
-  -----------------------------------------------------------------------------
-  28-Jun-2016, OK: added ALL_PART_TABLES
+  07-Dec-2021, OK: added IND_COLUMNS.
+  17-Nov-2021, OK: new version
 */
-  pc.owner, pc.name AS table_name, pc.column_name AS partitioned_by, tp.high_value,
-  CASE WHEN pc.column_name IN ('COB_DT', 'VAL_DT') THEN
-    eval_date(tp.high_value) -  CASE pt.partitioning_type
-      WHEN 'LIST' THEN INTERVAL '0' DAY
-      WHEN 'RANGE' THEN INTERVAL '1' DAY
-    END
-  END part_dt,
-  ip.index_name, ip.partition_name, ip.partition_position,
-  tp.compress_for AS tab_part_compression,
-  ip.compression AS part_compression,
-  ip.segment_created AS part_segm_created,
-  ip.status AS part_status,
-  isp.subpartition_name,
-  isp.compression AS subpart_compression,
-  isp.segment_created AS subpart_segm_created,
-  isp.status AS subpart_status
-FROM all_part_key_columns pc -- assumption: all tables are partitioned by 1 column
-CROSS JOIN TABLE(pkg_db_maintenance.get_partition_info(pc.owner, pc.name)) tp
-JOIN all_part_tables pt ON pt.owner = pc.owner AND pt.table_name = pc.name
-JOIN all_indexes i ON i.owner = pc.owner AND i.table_owner = pc.owner AND i.table_name = pc.name
-JOIN all_ind_partitions ip ON ip.index_owner = pc.owner AND ip.index_name = i.index_name AND ip.partition_position = tp.partition_position
-LEFT JOIN all_ind_subpartitions isp ON isp.index_owner = pc.owner AND isp.index_name = ip.index_name AND isp.partition_name = ip.partition_name;
+  i.owner index_owner, i.index_name, i.index_type, 
+  i.table_owner, i.table_name, i.uniqueness,
+  TO_CHAR(concat_v2_set
+  (
+    CURSOR
+    (
+      SELECT column_name || DECODE(descend, 'DESC', 'DESC')
+      FROM all_ind_columns
+      WHERE index_owner = i.owner
+      AND index_name = i.index_name
+      ORDER BY column_position
+    )
+  )) ind_columns,
+  i.status, i.pct_free, i.ini_trans, i.tablespace_name,
+  pi.partitioning_type, pi.locality, pi.alignment,
+  TO_CHAR(concat_v2_set
+  (
+    CURSOR
+    (
+      SELECT column_name 
+      FROM all_part_key_columns
+      WHERE owner = i.owner AND name = i.index_name
+      ORDER BY column_position
+    )
+  )) AS partitioned_by,
+  pi.subpartitioning_type,
+  TO_CHAR(concat_v2_set
+  (
+    CURSOR
+    (
+      SELECT column_name 
+      FROM all_subpart_key_columns
+      WHERE owner = i.owner AND name = i.index_name
+      ORDER BY column_position
+    )
+  )) AS sub_partitioned_by,
+  p.partition_name,
+  p.partition_position,
+  p.high_value        AS part_high_value,
+  p.status            AS part_status,
+  p.composite,
+  p.interval,
+  p.blevel            AS part_blevel,
+  p.num_rows          AS part_rows,
+  p.distinct_keys     AS part_distinct_keys,
+  p.clustering_factor AS part_clustering_factor,
+  p.segment_created   AS part_segment_created,
+  p.leaf_blocks       AS part_leaf_blocks,
+  p.compression       AS part_compression,
+  p.ini_trans         AS part_ini_trans,
+  p.tablespace_name   AS part_tablespace,
+  p.last_analyzed     AS part_last_analyzed,
+  p.global_stats
+FROM all_indexes i
+LEFT JOIN all_part_indexes pi ON pi.owner = i.owner AND pi.index_name = i.index_name
+LEFT JOIN TABLE(pkg_db_maintenance.get_index_partition_info(i.owner, i.index_name)) p ON 1=1;
+
+GRANT SELECT ON v_index_partition_info TO csid, ods, dba;
+
+BEGIN
+  FOR r IN
+  (
+    SELECT role FROM dba_roles WHERE role = 'DEPLOYER'
+  )
+  LOOP
+    EXECUTE IMMEDIATE 'GRANT SELECT ON v_index_partition_info TO '||r.role;
+  END LOOP;
+END;
+/

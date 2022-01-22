@@ -11,3 +11,5 @@ SELECT
   END data_type,
   nullable
 FROM all_tab_columns;
+
+GRANT SELECT ON v_all_columns TO PUBLIC;
