@@ -2,6 +2,7 @@ select * from dba_registry;
 
 --==============================================================================
 -- Q1:
+-- Q1-a: works fine with Oracle 19c:
 with 
   graph as 
   (
@@ -57,7 +58,7 @@ select id from
 where rn = 1
 order by lvl, id;
 
--- Q1-b (PL/SQL):
+-- Q1-b (PL/SQL) - to be used with older Oracle versions where CYCLE clause was not yet available:
 with
   graph as 
   (
@@ -122,6 +123,7 @@ group by username order by username;
 alter session set nls_timestamp_format = 'dd/mm/yyyy hh24:mi:ss.ff9';
 alter session set nls_timestamp_format = 'dd/mm/yyyy hh24:mi:ss';
 
+-- Q3-a, not so good because I selected twice from the same dataset (risk_values):
 with
   risk(created, expired, value) as
   (
@@ -147,7 +149,7 @@ select tstamp, sum(created_val) as total_created, sum(expired_val) total_expired
 from stats
 group by tstamp order by 1;
 
--- Q3-b, a better is be to unpivot/pivot, only one scan is needed:
+-- Q3-b, a better way is to unpivot/pivot requires only one scan:
 with
   risk(created, expired, value) as
   (
