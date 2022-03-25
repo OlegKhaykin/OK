@@ -17,10 +17,10 @@ with
     select  9 id,  9 parent_id from dual union all 
     select 12 id, 11 parent_id from dual
     -- I added the following 3 edges to see how cycles are handled:
-    union all 
-    select  6 id, 13 parent_id from dual union all
+    union all
+    select  10 id, 13 parent_id from dual union all
     select  13 id, 14 parent_id from dual union all
-    select  14 id, 6 parent_id from dual
+    select  14 id, 10 parent_id from dual
   ),
   norm as
   (
@@ -31,6 +31,7 @@ with
         greatest(id, parent_id) parent_id,
         least(id, parent_id) id
       from graph
+      where id <> parent_id -- to eliminate 9-9
     )
     order by id, parent_id
   ),
@@ -43,7 +44,6 @@ with
     join norm n
       on (n.id = h.id or n.parent_id = h.id)
      and n.rnum <> h.rnum
-     and n.id <> n.parent_id -- to eliminate 9-9
   )
   cycle id set is_cycle to 'Y' default 'N'
 select id from
@@ -56,6 +56,30 @@ select id from
 )
 where rn = 1
 order by lvl, id;
+
+-- Q1-b (PL/SQL):
+with
+  graph as 
+  (
+    select  1 id,  2 parent_id from dual union all 
+    select  1 id,  3 parent_id from dual union all 
+    select  4 id,  3 parent_id from dual union all 
+    select  5 id,  4 parent_id from dual union all 
+    select  6 id,  5 parent_id from dual union all 
+    select  7 id,  6 parent_id from dual union all 
+    select  8 id,  7 parent_id from dual union all 
+    select  7 id,  8 parent_id from dual union all
+    select  8 id, 10 parent_id from dual union all
+    select  9 id,  9 parent_id from dual union all 
+    select 12 id, 11 parent_id from dual
+    -- I added the following 3 edges to see how cycles are handled:
+    union all
+    select  10 id, 13 parent_id from dual union all
+    select  13 id, 14 parent_id from dual union all
+    select  14 id, 10 parent_id from dual
+  )
+select column_value id
+from table(pkg_graph.traverse(cursor(select * from graph), 1));
 
 --==============================================================================
 -- Q2:
