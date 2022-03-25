@@ -1,0 +1,14 @@
+CREATE OR REPLACE FUNCTION str_to_number(str IN VARCHAR2) RETURN NUMBER AS
+  rtn NUMBER;
+BEGIN
+  BEGIN
+    rtn := TO_NUMBER(str);
+  EXCEPTION
+   WHEN OTHERS THEN RTN := 0;
+  END;
+  
+  RETURN rtn;
+END;
+/
+
+GRANT EXECUTE ON str_to_number TO PUBLIC;

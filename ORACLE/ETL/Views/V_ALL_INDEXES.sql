@@ -9,4 +9,4 @@ SELECT
 FROM all_indexes i
 WHERE index_type = 'NORMAL';
 
-GRANT SELECT ON v_all_indexes TO PUBLIC;
+GRANT READ ON v_all_indexes TO PUBLIC;
