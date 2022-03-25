@@ -172,7 +172,7 @@ select * from
 ) pivot(max(value) for inst_id in (1/*,2,3,4,5,6,7,8*/))
 order by 1;
 
--- See available AWS snapshots:
+-- See available AWR snapshots:
 select * from dba_hist_ash_snapshot order by 1 desc;
 
 -- Get AWR report:
@@ -203,9 +203,9 @@ begin
   (
     start_snap_id => 979,
     end_snap_id   => 980,
-    baseline_name => 'peak baseline',
-    --dbid          => 3310949047, -- NULL by default - i.e. the current database
-    -- expiration    => 30
+    baseline_name => 'peak baseline'
+    --,dbid          => 3310949047, -- NULL by default - i.e. the current database
+    --,expiration    => 30
   );
 end;
 /
