@@ -4,6 +4,7 @@ CREATE OR REPLACE PACKAGE BODY debuger.pkg_dbg_xlogger AS
  
   History of changes - newest to oldest:
   ------------------------------------------------------------------------------
+  01-Mar-2022, OK: removed procedure WRITE_SUPPL_DATA.
   17-Mar-2020, OK: in CLOSE_LOG, dump in-memory data even if it is not the top-level call
   20-Feb-2020, OK: added column PLS_UNIT to DBG_LOG_DATA;
   10-Nov-2015, OK: new version;
@@ -127,14 +128,6 @@ CREATE OR REPLACE PACKAGE BODY debuger.pkg_dbg_xlogger AS
   END;
   
 
-  PROCEDURE write_suppl_data(p_name IN dbg_supplemental_data.name%TYPE, p_value IN SYS.AnyData) IS
-    PRAGMA AUTONOMOUS_TRANSACTION;
-  BEGIN
-    INSERT INTO dbg_supplemental_data VALUES(n_proc_id, p_name, SYSTIMESTAMP, p_value);
-    COMMIT;
-  END;
-    
-  
   PROCEDURE write_log
   (
     p_pls_unit  IN VARCHAR2,

@@ -3,7 +3,8 @@ CREATE OR REPLACE PACKAGE debuger.pkg_dbg_xlogger AS
   This package is for debugging and performance tuning
  
   History of changes (newest to oldest):
-  ------------------------------------------------------------------------------
+  -------------------------------------------------------------------------------
+  01-Mar-2022, OK: removed procedure WRITE_SUPPL_DATA.
   18-Feb-2020, OK: implemented adjustable log level setting (from another session);
   26-Dec-2019, OK: in BEGIN_ACTION, default value of P_LOG_LEVEL is 1 instead of 0;
   11-Dec-2019, OK: added procedure WRITE_SUPPL_DATA;
@@ -45,8 +46,6 @@ CREATE OR REPLACE PACKAGE debuger.pkg_dbg_xlogger AS
  
   PROCEDURE end_action(p_comment IN CLOB DEFAULT 'Completed');
   
-  PROCEDURE write_suppl_data(p_name IN dbg_supplemental_data.name%TYPE, p_value IN SYS.AnyData);
- 
   PROCEDURE close_log(p_result IN VARCHAR2 DEFAULT NULL, p_dump IN BOOLEAN DEFAULT FALSE);
   
   PROCEDURE spool_log(p_where IN VARCHAR2 DEFAULT NULL, p_max_rows IN PLS_INTEGER DEFAULT 100);
