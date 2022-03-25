@@ -99,49 +99,28 @@ with
     select 'U2' username, date '2013-08-08'+11/24 logon_time, date '2013-08-08'+13/24 logoff_time from dual union all
     select 'U2' username, date '2013-08-08'+10/24 logon_time, date '2013-08-08'+14/24 logoff_time from dual
   ),
-  sess as
-  ( -- I am going to select more than once from this dataset. Therefore, it makes sense to materialize it.
-    select /*+ materialize */ rownum as sid, q.*
-    from
-    (
-      select * from log
-      order by logon_time, logoff_time, username
-    ) q
-  ),
-  moments as
+  events as
   (
-    select logon_time as dtime from sess
-    union
-    select logoff_time from sess
-  ),
-  periods as
-  (
-    select
-      dtime start_dt,
-      lead(dtime) over(order by dtime) end_dt
-    from moments
-  ),
-  sess_counts as
-  (
-    select
-      p.start_dt, p.end_dt, s.username,
-      count(1) sess_cnt
-    from periods p
-    join sess s
-      on s.logon_time <= p.start_dt
-     and s.logoff_time >= p.end_dt
-    group by p.start_dt, p.end_dt, s.username
+    select username, tstamp, event
+    from log unpivot(tstamp for event in (logon_time as 1, logoff_time as -1))
   )
 select
   username,
   max(sess_cnt) cnt_sessions,
-  min(start_dt) keep(dense_rank last order by sess_cnt) time
-from sess_counts
+  min(tstamp) keep(dense_rank last order by sess_cnt) time
+from
+(
+  select
+    username, tstamp,
+    sum(event) over(partition by username order by tstamp rows between unbounded preceding and current row) sess_cnt
+  from events
+)
 group by username order by username;
 
 --==============================================================================
 -- Q3:
 alter session set nls_timestamp_format = 'dd/mm/yyyy hh24:mi:ss.ff9';
+alter session set nls_timestamp_format = 'dd/mm/yyyy hh24:mi:ss';
 
 with
   risk(created, expired, value) as
@@ -167,6 +146,26 @@ with
 select tstamp, sum(created_val) as total_created, sum(expired_val) total_expired
 from stats
 group by tstamp order by 1;
+
+-- Q3-b, a better is be to unpivot/pivot, only one scan is needed:
+with
+  risk(created, expired, value) as
+  (
+    select timestamp '2022-01-01 00:00:01', timestamp '2022-01-01 00:00:02', 1 from dual union all
+    select timestamp '2022-01-01 00:00:01', timestamp '2022-01-01 00:00:03', 10 from dual union all
+    select timestamp '2022-01-01 00:00:01', null, 100 from dual union all
+    select timestamp '2022-01-01 00:00:02', null, 2000 from dual union all
+    select timestamp '2022-01-01 00:00:02', timestamp '2022-01-01 00:00:03', 1000 from dual union all
+    select timestamp '2022-01-01 00:00:02', timestamp '2022-01-01 00:00:04', 10000 from dual union all
+    select timestamp '2022-01-01 00:00:04', null, 100000 from dual
+  )
+select * from
+(
+  select tstamp, balance_type, value
+  from risk unpivot(tstamp for balance_type in (created as 'C', expired AS 'E'))
+)
+pivot(sum(value) for balance_type in ('C' as total_created, 'E' as total_expired))
+order by tstamp;
 
 --==============================================================================
 -- Q4:

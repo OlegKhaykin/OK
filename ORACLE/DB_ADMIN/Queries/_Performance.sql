@@ -135,8 +135,9 @@ select * from gv$sql_monitor;
 --================================= Execution plans ====================================
 -- For the last EXPLAIN PLAN:
 explain plan for
-SELECT PS.MEMBERID FROM AHMMRNBUSINESSSUPPLIER BS 
-JOIN CAREENGINEMEMBERPROCESSSTATUS PS ON PS.MEMBERID = BS.AHMMRNMEMBERID WHERE BS.LASTBUSINESSAHMSUPPLIERID =12906 ;
+select ps.memberid from ahmmrnbusinesssupplier bs 
+join careenginememberprocessstatus ps
+ on ps.memberid = bs.ahmmrnmemberid where bs.lastbusinessahmsupplierid =12906 ;
 
 select plan_table_output from table(dbms_xplan.display);
 
@@ -153,13 +154,7 @@ select * from table
 );
 
 --==============================================================================
---
-select * from dba_hist_sqltext where sql_text like '%FROM patientmedicalprocedure%';
-
--- Plan captured in AWR:
-select * from table(dbms_xplan.display_awr('...'));
-
---==============================================================================
+-- AWR
 -- See if AWR is available:
 select * from
 (
@@ -181,6 +176,7 @@ select dbms_workload_repository.awr_report_text(4251913509, 1, 993, 994, 8) from
 -- But better use the following scripts located in $ORACLE_HOME/rdbms/admin:
 -- awrrpt.sql   - for the local database 
 -- awrrpti.sql  - for specific instance
+-- . . . 
 
 --------------------------------------------------------------------------------
 -- ADDM:
@@ -210,4 +206,26 @@ begin
 end;
 /
 
+-- See SQL execution statistics
+select * from dba_hist_sqlstat
+where snap_id = 979
+and sql_id = '8y6q8umcqybwr';
+
+-- Find a particular SQL in AWR:
+select * from dba_hist_sqltext
+where sql_id = '8y6q8umcqybwr'
+--where sql_text like '%FROM patientmedicalprocedure%'
+;
+
+-- Plan captured in AWR:
+select * from table
+(
+  dbms_xplan.display_awr
+  (
+    sql_id => '8y6q8umcqybwr',
+    plan_hash_value => 2844803677,
+    --db_id IN NUMBER DEFAULT NULL,
+    format => 'TYPICAL' -- BASIC, SERIAL, ALL; default - TYPICAL
+  )
+);
 
