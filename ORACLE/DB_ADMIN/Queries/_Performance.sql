@@ -160,23 +160,54 @@ select * from dba_hist_sqltext where sql_text like '%FROM patientmedicalprocedur
 select * from table(dbms_xplan.display_awr('...'));
 
 --==============================================================================
--- ADDM is available:
+-- See if AWR is available:
 select * from
 (
   select inst_id, name, value 
   from gv$parameter where name in 
   (
-    'control_management_pack_access', -- DIAGNOSTIC+TUNING
-    'statistics_level' -- TYPICAL
+    'control_management_pack_access', -- should be DIAGNOSTIC+TUNING
+    'statistics_level'                -- should be TYPICAL or ALL
   )
-) pivot(max(value) for inst_id in (1,2,3,4,5,6,7,8))
+) pivot(max(value) for inst_id in (1/*,2,3,4,5,6,7,8*/))
 order by 1;
 
--- Need ADVISOR privilege to run ADDM manually:
-select * from dba_sys_privs where privilege = 'ADVISOR';
-
 -- See available AWS snapshots:
+select * from dba_hist_ash_snapshot order by 1 desc;
+
+-- Get AWR report:
+-- In theory, you can do this:
+select dbms_workload_repository.awr_report_text(4251913509, 1, 993, 994, 8) from dual;
+-- But better use the following scripts located in $ORACLE_HOME/rdbms/admin:
+-- awrrpt.sql   - for the local database 
+-- awrrpti.sql  - for specific instance
+
+--------------------------------------------------------------------------------
+-- ADDM:
+-- Need ADVISOR privilege to run ADDM:
+select * from user_sys_privs where privilege = 'ADVISOR';
 
 -- To run ADDM manually in the database mode:
-var task varchar2(30)
-exec dbms_addm.anayze_db();
+declare
+  task varchar2(30) := 'ADDM for snapshots 993-994';
+begin
+  dbms_addm.analyze_db(task, 993, 994);
+end;
+/
+-- See ADDM report:
+select dbms_addm.get_report('ADDM for snapshots 993-994') from dual;
+
+-- Create a performace baseline - a difference between 2 AWR snapshots:
+begin
+  dbms_workload_repository.create_baseline
+  (
+    start_snap_id => 979,
+    end_snap_id   => 980,
+    baseline_name => 'peak baseline',
+    --dbid          => 3310949047, -- NULL by default - i.e. the current database
+    -- expiration    => 30
+  );
+end;
+/
+
+
