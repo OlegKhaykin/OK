@@ -149,7 +149,7 @@ select tstamp, sum(created_val) as total_created, sum(expired_val) total_expired
 from stats
 group by tstamp order by 1;
 
--- Q3-b, a better way is to unpivot/pivot requires only one scan:
+-- Q3-b, a better way is to unpivot/pivot - requires only one scan:
 with
   risk(created, expired, value) as
   (
