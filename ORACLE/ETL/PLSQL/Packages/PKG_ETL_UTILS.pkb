@@ -228,8 +228,8 @@ CREATE OR REPLACE PACKAGE BODY etladmin.pkg_etl_utils AS
     n_cnt             PLS_INTEGER;
     b_del_notfound    BOOLEAN := FALSE;
     
-    -- Procedure COLLECT_METADATA gathers information about the columns of the target table and the columns of the source table/view.
-    -- Gathered information is stored in TMP_COLUMN_INFO and then used for generating DML statements.
+    -- Procedure COLLECT_METADATA gathers information about the columns of the target table and the source table/view.
+    -- Gathered information is stored in TMP_COLUMN_INFO and then used in to generate DML statements.
     PROCEDURE collect_metadata IS
       PRAGMA AUTONOMOUS_TRANSACTION;
     BEGIN

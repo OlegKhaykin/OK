@@ -54,9 +54,9 @@ CREATE OR REPLACE PACKAGE pkg_etl_utils AS
     q'[vid, cob_date = my_sequence.NEXTVAL, SYS_CONTEXT('IDL_CONTEXT','COB_DATE')]'
     Lower/Upper case is important only in string literals. Spaces around "=" and "," are optional.
     
-    This data generation occurs ONLY DURING INSERT, not on update!
-    It is mainly used for generating surrogate keys out of sequences - like the VID column in the above example.
-    The other column - COB_DATE - could be included into the source view/query instead,
+    This data generation occurs ONLY DURING INSERT, not on during update!
+    It is mainly used for generating surrogate keys out of sequences - like the VID column
+    in the above example. The other column - COB_DATE - could be included into the source view/query instead,
     in which case it would be assigned BOTH WHILE INSERTING AND UPDATING.
     
   - P_DELETE - defines deletion logic for UPDATE and MERGE operations.
