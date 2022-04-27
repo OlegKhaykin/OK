@@ -18,10 +18,10 @@ with
     select  9 id,  9 parent_id from dual union all 
     select 12 id, 11 parent_id from dual
     -- I added the following 3 edges to see how cycles are handled:
-    union all
+    /*union all
     select  10 id, 13 parent_id from dual union all
     select  13 id, 14 parent_id from dual union all
-    select  14 id, 10 parent_id from dual
+    select  14 id, 10 parent_id from dual*/
   ),
   norm as
   (
