@@ -10,6 +10,7 @@ CREATE OR REPLACE PACKAGE BODY etladmin.pkg_etl_utils AS
   
   History of changes (newest to oldest):
   ------------------------------------------------------------------------------
+  31-Aug-2022, OK: added DEBUG mode.
   20-Feb-2021, OK: added logging of row count after "one-shot" DML execution. 
   27-Nov-2020, OK: added possibility to match by ROWID in the DELETE_DATA procedure.
   14-Sep-2020, OK: bug fix - use current schema if no schema name is in the table specification.
@@ -26,6 +27,19 @@ CREATE OR REPLACE PACKAGE BODY etladmin.pkg_etl_utils AS
 
   remote_object EXCEPTION;
   PRAGMA EXCEPTION_INIT(remote_object, -20001);
+  
+  b_debug       BOOLEAN := FALSE;
+  
+  PROCEDURE set_debug IS
+  BEGIN
+    b_debug := CASE WHEN UPPER(NVL(SYS_CONTEXT('CTX_LOCAL_ETL','DEBUG'), 'FALSE')) = 'TRUE' THEN TRUE ELSE FALSE END;
+  END;
+ 
+  -- Format a numeric string nicely
+  PROCEDURE int_str(p_int IN INTEGER) IS
+  BEGIN
+    RETURN LTRIM(TO_CHAR(p_int, '999G999G999G999G999'));
+  END;
   
   -- Procedure PARSE_NAME splits the given name into 3 pieces:
   -- 1) schema, 2) table/view name and 3) DB_link
@@ -186,8 +200,8 @@ CREATE OR REPLACE PACKAGE BODY etladmin.pkg_etl_utils AS
     p_versions        IN VARCHAR2 DEFAULT NULL, -- see the procedure description in the package specification 
     p_commit_at       IN NUMBER   DEFAULT 0,    -- see the procedure description in the package specification 
     p_errtab          IN VARCHAR2 DEFAULT NULL, -- optional error log table,
-    p_add_cnt         IN OUT PLS_INTEGER, -- number of added/changed rows
-    p_err_cnt         IN OUT PLS_INTEGER  -- number of errors
+    p_add_cnt         IN OUT INTEGER,           -- number of added/changed rows
+    p_err_cnt         IN OUT INTEGER            -- number of errors
   ) IS
     v_sess_id         VARCHAR2(30);
     ts_start          TIMESTAMP;
@@ -223,7 +237,7 @@ CREATE OR REPLACE PACKAGE BODY etladmin.pkg_etl_utils AS
     v_until_expr      VARCHAR2(100);
     c_until_nullable  CHAR(1);
     v_src             VARCHAR2(32000);
-    v_cmd             VARCHAR2(32000);
+    v_cmd             CLOB;
     v_act             VARCHAR2(5000);
     n_cnt             PLS_INTEGER;
     b_del_notfound    BOOLEAN := FALSE;
@@ -241,7 +255,7 @@ CREATE OR REPLACE PACKAGE BODY etladmin.pkg_etl_utils AS
       INSERT INTO tmp_all_columns(side, owner, table_name, column_id, column_name, data_type, uk, nullable)
       SELECT 'SRC', cl.owner, cl.table_name, cl.column_id, cl.column_name, cl.data_type, 'N', 'Y'
       FROM v_all_columns cl
-      WHERE cl.owner = v_src_schema AND cl.table_name = v_src_table
+      WHERE cl.owner = v_src_schema AND cl.table_name = v_src_table AND cl.column_id IS NOT NULL -- invisible columns have NULL in COLUMN_ID
       UNION
       SELECT 'TGT', cl.owner, cl.table_name, cl.column_id, cl.column_name, cl.data_type, NVL2(cc.column_name, 'Y', 'N') uk, cl.nullable
       FROM v_all_columns cl
@@ -516,6 +530,8 @@ CREATE OR REPLACE PACKAGE BODY etladmin.pkg_etl_utils AS
       ),
       4, $$PLSQL_UNIT
     );
+    
+    b_debug := set_debug;
     n_cnt := INSTR(p_operation, ' ');
     
     IF n_cnt = 0 THEN n_cnt := LENGTH(p_operation); END IF;
@@ -910,30 +926,39 @@ END;';
       
       v_act := 'Processing source data by portions';
       xl.begin_action(v_act, v_cmd, 5, $$PLSQL_UNIT);
+      IF b_debug THEN
+        n_cnt := 0; p_add_cnt := 0;
+        xl.end_action('Not executed: DEBUG=TRUE');
+      ELSE
         IF v_err_table IS NOT NULL THEN
           EXECUTE IMMEDIATE v_cmd USING IN OUT n_cnt, IN OUT p_add_cnt, p_commit_at, v_sess_id, v_act;
         ELSE
           EXECUTE IMMEDIATE v_cmd USING IN OUT n_cnt, IN OUT p_add_cnt, p_commit_at, v_act;
         END IF;
-        v_cmd := NULL;
-      xl.end_action('Totally: '||n_cnt||' rows selected from the source; '||p_add_cnt||' rows inserted/updated in the target.');
+      END IF;
+      xl.end_action('Totally: '||int_str(n_cnt)||' rows selected from the source; '||int_str(p_add_cnt)||' rows inserted/updated in the target.');
  
     ELSE -- "one-shot" load
       xl.begin_action('Executing DML command', v_cmd, 5, $$PLSQL_UNIT);
-      IF v_err_table IS NOT NULL THEN
-        EXECUTE IMMEDIATE v_cmd USING v_sess_id;
-        p_add_cnt := SQL%ROWCOUNT;
+      IF b_debug THEN
+        p_add_cnt := 0;
+        xl.end_action('Not executed: DEBUG=TRUE');
       ELSE
-        EXECUTE IMMEDIATE v_cmd;
-        p_add_cnt := SQL%ROWCOUNT;
+        IF v_err_table IS NOT NULL THEN
+          EXECUTE IMMEDIATE v_cmd USING v_sess_id;
+          p_add_cnt := SQL%ROWCOUNT;
+        ELSE
+          EXECUTE IMMEDIATE v_cmd;
+          p_add_cnt := SQL%ROWCOUNT;
+        END IF;
       END IF;
-      v_cmd := NULL;
       xl.end_action(p_add_cnt||' rows inserted/updated');
       
       IF p_commit_at <> 0 THEN
         COMMIT;
       END IF;
     END IF;
+    v_cmd := NULL;
     
     IF v_err_table IS NOT NULL THEN
       EXECUTE IMMEDIATE 'SELECT COUNT(1) FROM '||v_err_schema||'.'||v_err_table||' WHERE ora_err_tag$ = :tag AND entry_ts >= :ts'
@@ -944,7 +969,7 @@ END;';
     
     clean_up;
     
-    xl.end_action(p_add_cnt||' rows added'|| CASE WHEN v_operation <> 'INSERT' THEN ' or changed' || CASE WHEN v_del_cond IS NOT NULL THEN ' or deleted' END END || '; '||p_err_cnt||' errors found');
+    xl.end_action(int_str(p_add_cnt)||' rows added'|| CASE WHEN v_operation <> 'INSERT' THEN ' or changed' || CASE WHEN v_del_cond IS NOT NULL THEN ' or deleted' END END || '; '||int_str(p_err_cnt)||' errors found');
   EXCEPTION
    WHEN OTHERS THEN
     xl.end_action(SQLERRM);
@@ -998,7 +1023,7 @@ END;';
     p_commit_at   IN PLS_INTEGER DEFAULT 0,
     p_del_cnt     IN OUT PLS_INTEGER -- number of deleted rows
   ) IS
-    v_match_cols     VARCHAR2(2000);
+    v_match_cols  VARCHAR2(2000);
     v_hint        VARCHAR2(500);
     v_cmd         VARCHAR2(4000);
   BEGIN
@@ -1009,7 +1034,9 @@ END;';
       CASE WHEN p_match_cols IS NOT NULL THEN ', p_match_cols='||p_match_cols END,
       4, $$PLSQL_UNIT
     );
-   
+    
+    set_debug;
+    
     IF p_match_cols IS NOT NULL THEN
       v_match_cols := p_match_cols;
      
@@ -1031,16 +1058,22 @@ END;';
       SELECT '||v_hint||' '||REPLACE(v_match_cols, 'ROWID', 'row_id')||' FROM '||p_source||' s '||
       CASE WHEN p_where IS NOT NULL THEN 'WHERE '||p_where END ||'
     )';
+    
     xl.begin_action('Executing command', v_cmd, 5, $$PLSQL_UNIT);
-    EXECUTE IMMEDIATE v_cmd;
-    p_del_cnt := SQL%ROWCOUNT;
-    xl.end_action;
-   
+    IF b_debug THEN
+      p_del_cnt := 0;
+      xl.end_action('Not executed: DEBUG=TRUE');
+    ELSE
+      EXECUTE IMMEDIATE v_cmd;
+      p_del_cnt := SQL%ROWCOUNT;
+      xl.end_action;
+    END IF;
+    
     IF p_commit_at <> 0 THEN
       COMMIT;
     END IF;
     
-    xl.end_action(p_del_cnt||' rows deleted');
+    xl.end_action(int_str(p_del_cnt)||' rows deleted');
   END;
   
   
@@ -1064,14 +1097,14 @@ END;';
   -- Procedure SET_PARAMETER sets parameter value in the local namespace
   PROCEDURE set_parameter(p_name IN VARCHAR2, p_value IN VARCHAR2) IS
   BEGIN
-    DBMS_SESSION.SET_CONTEXT('CTX_OK_LOCAL', p_name, p_value);
+    DBMS_SESSION.SET_CONTEXT('CTX_LOCAL_ETL', p_name, p_value);
   END;
 
 
   -- Procedure CLEAR_PARAMETER clears parameter value in the local namespace
   PROCEDURE clear_parameter(p_name IN VARCHAR2) IS
   BEGIN
-    DBMS_SESSION.CLEAR_CONTEXT('CTX_OK_LOCAL', p_name);
+    DBMS_SESSION.CLEAR_CONTEXT('CTX_LOCAL_ETL', p_name);
   END;
 END;
 /
