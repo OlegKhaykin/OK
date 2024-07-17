@@ -1,0 +1,12 @@
+DROP VIEW IF EXISTS v_claims CASCADE;
+DROP VIEW IF EXISTS v_prescriptions CASCADE;
+DROP VIEW IF EXISTS v_htrack_results CASCADE;
+DROP VIEW IF EXISTS v_lab_results CASCADE;
+DROP VIEW IF EXISTS v_patient_diagnoses CASCADE;
+DROP VIEW IF EXISTS v_patient_medical_procedures CASCADE;
+DROP VIEW IF EXISTS v_pre_certifications CASCADE;
+DROP VIEW IF EXISTS v_pre_cert_diagnoses CASCADE;
+DROP VIEW IF EXISTS v_pre_cert_procedures CASCADE;
+DROP VIEW IF EXISTS v_reported_drug_usage CASCADE;
+DROP VIEW IF EXISTS v_hra_survey_results CASCADE;
+DROP VIEW IF EXISTS v_hra_htrack_results CASCADE;

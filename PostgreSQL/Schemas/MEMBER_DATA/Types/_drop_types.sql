@@ -1,0 +1,11 @@
+DROP TYPE IF EXISTS typ_member_info CASCADE;
+DROP TYPE IF EXISTS typ_pre_certification CASCADE;
+DROP TYPE IF EXISTS typ_pre_cert_diagnosis CASCADE;
+DROP TYPE IF EXISTS typ_pre_cert_procedure CASCADE;
+DROP TYPE IF EXISTS typ_claim CASCADE;
+DROP TYPE IF EXISTS typ_lab_result CASCADE;
+DROP TYPE IF EXISTS typ_patient_diagnosis CASCADE;
+DROP TYPE IF EXISTS typ_patient_medical_procedure CASCADE;
+DROP TYPE IF EXISTS typ_prescription CASCADE;
+DROP TYPE IF EXISTS typ_drug_usage CASCADE;
+DROP TYPE IF EXISTS typ_hra_survey_response CASCADE;
