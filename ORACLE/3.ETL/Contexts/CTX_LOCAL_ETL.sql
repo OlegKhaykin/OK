@@ -1,0 +1,1 @@
+CREATE OR REPLACE CONTEXT ctx_local_etl USING pkg_etl_utils;  
